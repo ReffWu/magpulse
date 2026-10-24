@@ -16,6 +16,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bindState()
         observeSystemTheme()
         startBatteryPolling()
+        
+        // 启动 Sparkle 2 自动检查更新
+        Updater.shared.start()
+    }
+    
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            handleURL(url)
+        }
+    }
+    
+    private func handleURL(_ url: URL) {
+        guard url.scheme == "magpulse" else { return }
+        let host = url.host ?? ""
+        if host == "status" || host == "open" {
+            if let button = statusItem.button {
+                popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            }
+        } else if host == "pulse" {
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            let stateStr = components?.queryItems?.first(where: { $0.name == "state" })?.value ?? "busy"
+            switch stateStr.lowercased() {
+            case "busy":
+                ArbiterEngine.shared.triggerTest(state: .busy, duration: 4.0)
+            case "done":
+                ArbiterEngine.shared.triggerTest(state: .done, duration: 4.0)
+            case "permission", "waiting", "wait":
+                ArbiterEngine.shared.triggerTest(state: .permission, duration: 4.0)
+            default:
+                ArbiterEngine.shared.triggerTest(state: .idle, duration: 1.0)
+            }
+        }
     }
     
     func applicationWillTerminate(_ notification: Notification) {
@@ -25,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func setupPopover() {
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 330, height: 510)
+        popover.contentSize = NSSize(width: 330, height: 530)
         popover.behavior = .transient
         popover.animates = true
         popover.contentViewController = NSHostingController(rootView: PopoverView())

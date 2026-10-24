@@ -288,43 +288,46 @@ public final class ArbiterEngine: ObservableObject {
     }
     
     /// Antigravity 活跃检测：
-    /// 1. 进程是否开启
-    /// 2. 是否有除常驻 MCP 外的命令子进程 (如正在执行 run_command, git, 脚本等)
-    /// 3. language_server 是否处于高 CPU 密集推理/流式输出 (> 15%)
+    /// 1. 核心真理源：Swift 原生扫描 ~/.gemini/antigravity/brain/ 下 transcript.jsonl 的最后更新时间
+    ///    若最新写入时间 <= 40 秒，说明当前回合正在思考、调用工具或流式输出中 (BUSY)
+    /// 2. 辅助进程检测：检查 language_server 进程及其衍生命令子进程 (排除常驻 MCP)
     private func isAntigravityActive() -> Bool {
-        let apps = NSWorkspace.shared.runningApplications
-        let hasAntigravityApp = apps.contains { $0.bundleIdentifier == "com.google.antigravity" }
-        if !hasAntigravityApp {
-            return false
+        // A. 权威文件事件检测 (无外部进程开销，毫秒级)
+        let home = NSHomeDirectory()
+        let brainDir = URL(fileURLWithPath: home).appendingPathComponent(".gemini/antigravity/brain")
+        let manager = FileManager.default
+        
+        if let trajectories = try? manager.contentsOfDirectory(at: brainDir, includingPropertiesForKeys: [.contentModificationDateKey]) {
+            let now = Date()
+            for traj in trajectories {
+                let transcript = traj.appendingPathComponent(".system_generated/logs/transcript.jsonl")
+                if let attrs = try? manager.attributesOfItem(atPath: transcript.path),
+                   let mod = attrs[.modificationDate] as? Date {
+                    if now.timeIntervalSince(mod) <= 40.0 {
+                        return true
+                    }
+                }
+            }
         }
         
+        // B. 进程树检测：检查 language_server 是否在运行且有派生的非 MCP 任务进程
         let task = Process()
         task.launchPath = "/bin/sh"
         task.arguments = ["-c", """
-        ps -ax -o pid,%cpu,command | while read -r pid cpu cmd; do
-            case "$cmd" in
-                *Antigravity.app*language_server*)
-                    # 1. 检查 CPU 是否密集生成 (> 15.0)
-                    is_busy=$(awk -v c="$cpu" 'BEGIN {print (c > 15.0) ? "1" : "0"}')
-                    if [ "$is_busy" = "1" ]; then
-                        exit 0
-                    fi
-                    
-                    # 2. 检查是否有执行外部命令的子进程 (排除常驻 MCP)
-                    for cp in $(pgrep -P "$pid" 2>/dev/null); do
-                        c_cmd=$(ps -p "$cp" -o command= 2>/dev/null)
-                        case "$c_cmd" in
-                            *workspace-mcp*|*perplexica-mcp*|*rea-agents*|*open-computer-use*|*mcp-searxng*|*" mcp"*)
-                                ;;
-                            *)
-                                if [ -n "$c_cmd" ]; then
-                                    exit 0
-                                fi
-                                ;;
-                        esac
-                    done
-                    ;;
-            esac
+        for pid in $(pgrep -f "language_server.*antigravity" 2>/dev/null); do
+            # 检查是否有任务子进程正在跑命令 (如 run_command, git, python 等)
+            for cp in $(pgrep -P "$pid" 2>/dev/null); do
+                c_cmd=$(ps -p "$cp" -o command= 2>/dev/null)
+                case "$c_cmd" in
+                    *workspace-mcp*|*perplexica-mcp*|*rea-agents*|*open-computer-use*|*mcp-searxng*|*" mcp"*)
+                        ;;
+                    *)
+                        if [ -n "$c_cmd" ]; then
+                            exit 0
+                        fi
+                        ;;
+                esac
+            done
         done
         exit 1
         """]

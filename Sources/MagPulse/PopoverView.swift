@@ -49,11 +49,18 @@ public struct PopoverView: View {
                     sectionTitle("物理灯效速测", icon: "sparkle")
                     
                     testButtonGroup
+                    
+                    Divider()
+                        .opacity(0.12)
+                        .padding(.vertical, 2)
+                    
+                    // 分组 3: Reff Wu 的更多作品宣传
+                    moreAppsSection
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
-            .frame(maxHeight: 380)
+            .frame(maxHeight: 400)
             
             Divider()
                 .opacity(0.15)
@@ -63,8 +70,11 @@ public struct PopoverView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
         }
-        .frame(width: 330, height: 510)
+        .frame(width: 330, height: 530)
         .background(VisualEffectView(material: .popover, blendingMode: .behindWindow))
+        .onAppear {
+            MoreApps.shared.refreshIfStale()
+        }
     }
     
     // MARK: - Components
@@ -235,13 +245,104 @@ public struct PopoverView: View {
         .buttonStyle(.plain)
     }
     
+    private var moreAppsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("Reff Wu 的更多作品", icon: "sparkles.rectangle.stack")
+            
+            VStack(spacing: 5) {
+                ForEach(MoreApps.shared.entries) { entry in
+                    let installed = MoreApps.installedURL(for: entry)
+                    HStack(spacing: 8) {
+                        Group {
+                            if let icon = MoreApps.shared.icons[entry.id] {
+                                Image(nsImage: icon)
+                                    .resizable()
+                                    .interpolation(.high)
+                            } else {
+                                RoundedRectangle(cornerRadius: 5)
+                                    .fill(Color.primary.opacity(0.06))
+                                    .overlay(
+                                        Image(systemName: "app.fill")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.secondary)
+                                    )
+                            }
+                        }
+                        .frame(width: 22, height: 22)
+                        .cornerRadius(5)
+                        
+                        VStack(alignment: .leading, spacing: 1) {
+                            HStack(spacing: 5) {
+                                Text(entry.name)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.primary)
+                                
+                                if installed != nil {
+                                    HStack(spacing: 3) {
+                                        Circle().fill(Color.green).frame(width: 4.5, height: 4.5)
+                                        Text("已安装")
+                                            .font(.system(size: 8.5, weight: .medium))
+                                            .foregroundColor(.green)
+                                    }
+                                }
+                            }
+                            Text(entry.taglineInChinese())
+                                .font(.system(size: 9.5))
+                                .foregroundColor(.secondary.opacity(0.8))
+                                .lineLimit(1)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            if let installed {
+                                NSWorkspace.shared.openApplication(at: installed, configuration: NSWorkspace.OpenConfiguration())
+                            } else {
+                                NSWorkspace.shared.open(entry.page)
+                            }
+                        }) {
+                            Text(installed != nil ? "打开" : "获取")
+                                .font(.system(size: 9.5, weight: .medium))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2.5)
+                                .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.06)))
+                                .foregroundColor(.primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.02)))
+                }
+            }
+        }
+    }
+    
     private var footerBar: some View {
-        HStack {
+        HStack(alignment: .center) {
             Toggle("开机自启", isOn: $settings.launchAtLogin)
                 .font(.system(size: 11))
                 .toggleStyle(CheckboxToggleStyle())
             
             Spacer()
+            
+            Button(action: {
+                Updater.shared.checkForUpdates()
+            }) {
+                HStack(spacing: 3) {
+                    Text("v\(Updater.shared.currentVersion)")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                    Text("检查更新")
+                        .font(.system(size: 10))
+                        .foregroundColor(.accentColor)
+                }
+            }
+            .buttonStyle(.plain)
+            
+            Text("•")
+                .font(.system(size: 10))
+                .foregroundColor(.secondary.opacity(0.3))
             
             Button("退出") {
                 NSApp.terminate(nil)
