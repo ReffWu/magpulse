@@ -81,6 +81,7 @@ fi
 echo "▸ 9. 生成 Sparkle 自动更新 feed (appcast.xml)..."
 mkdir -p "$feed"
 cp "$dmg" "$feed/"
+curl -sLf "https://github.com/$repo/releases/latest/download/appcast.xml" -o "$feed/appcast.xml" 2>/dev/null || true
 
 # 寻找 generate_appcast 工具
 GEN_APPCAST=""
@@ -99,8 +100,16 @@ fi
 
 if [ "${1:-}" = "--publish" ]; then
   echo "▸ 10. 发布到 GitHub Release ($repo v$version)..."
+  cat > "$root/release_notes.md" << 'EOF'
+### MagPulse 1.0.1
+
+- **Antigravity 毫秒级原生状态感知**：直接对接 Antigravity 官方 SQLite 本地状态库 (`~/.gemini/antigravity/conversation_summaries.db`)，彻底解决回答完成后延迟 40 秒才恢复待命的问题，实现 0 秒瞬时响应。
+- **状态栏同款实时硬件接头**：弹窗 Header 图标去除黑色外壳容器，采用透明背景直出，中央 LED 光珠实时跟随硬件 SMC 变色呼吸。
+- **全新底栏微胶囊控件组**：开机自启微型胶囊开关、v1.0.1 版本状态与 Sparkle 更新徽标、极简退出按键。
+EOF
+
   gh release create -R "$repo" "v$version" "$dmg" "$root/$app.dmg.sha256" "$feed/appcast.xml" \
-    --title "$app $version" --target main --draft
+    --title "$app $version" --notes-file "$root/release_notes.md" --target main --draft
   gh release edit -R "$repo" "v$version" --draft=false --latest
   echo "✓ 成功发布到 GitHub Release!"
 fi
