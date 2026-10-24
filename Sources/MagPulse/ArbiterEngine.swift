@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import CoreGraphics
 import AppKit
+import SQLite3
 
 public final class ArbiterEngine: ObservableObject {
     public static let shared = ArbiterEngine()
@@ -287,57 +288,38 @@ public final class ArbiterEngine: ObservableObject {
         }
     }
     
-    /// Antigravity 活跃检测：
-    /// 1. 核心真理源：Swift 原生扫描 ~/.gemini/antigravity/brain/ 下 transcript.jsonl 的最后更新时间
-    ///    若最新写入时间 <= 40 秒，说明当前回合正在思考、调用工具或流式输出中 (BUSY)
-    /// 2. 辅助进程检测：检查 language_server 进程及其衍生命令子进程 (排除常驻 MCP)
+    /// Antigravity 官方原生状态检测 (毫秒级零延迟)：
+    /// 1. 进程前置检测：确保 com.google.antigravity 正在运行
+    /// 2. 官方真理源数据库：直接以只读模式查询 Antigravity 本地状态库 (~/.gemini/antigravity/conversation_summaries.db)
+    ///    官方原生字段：status == 'CASCADE_RUN_STATUS_RUNNING' 或 not_fully_idle == 1 表示模型思考、工具执行或流式生成中
+    ///    一旦回答完毕进入等待用户输入状态，官方瞬间切回 CASCADE_RUN_STATUS_IDLE 且 not_fully_idle = 0，实现 0 秒瞬时感知完成！
     private func isAntigravityActive() -> Bool {
-        // A. 权威文件事件检测 (无外部进程开销，毫秒级)
-        let home = NSHomeDirectory()
-        let brainDir = URL(fileURLWithPath: home).appendingPathComponent(".gemini/antigravity/brain")
-        let manager = FileManager.default
+        // A. 进程前置校验：如果 Antigravity 应用未启动，直接判定为非活跃
+        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.google.antigravity")
+        guard !apps.isEmpty else { return false }
         
-        if let trajectories = try? manager.contentsOfDirectory(at: brainDir, includingPropertiesForKeys: [.contentModificationDateKey]) {
-            let now = Date()
-            for traj in trajectories {
-                let transcript = traj.appendingPathComponent(".system_generated/logs/transcript.jsonl")
-                if let attrs = try? manager.attributesOfItem(atPath: transcript.path),
-                   let mod = attrs[.modificationDate] as? Date {
-                    if now.timeIntervalSince(mod) <= 40.0 {
-                        return true
-                    }
+        // B. 官方 SQLite 状态库只读检索 (耗时 ~1ms，WAL 模式零锁竞争)
+        let home = NSHomeDirectory()
+        let dbPath = (home as NSString).appendingPathComponent(".gemini/antigravity/conversation_summaries.db")
+        
+        var db: OpaquePointer?
+        if sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil) == SQLITE_OK {
+            defer { sqlite3_close(db) }
+            var stmt: OpaquePointer?
+            let sql = """
+            SELECT 1 FROM conversation_summaries 
+            WHERE killed = 0 AND (not_fully_idle = 1 OR status = 'CASCADE_RUN_STATUS_RUNNING') 
+            LIMIT 1;
+            """
+            if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+                defer { sqlite3_finalize(stmt) }
+                if sqlite3_step(stmt) == SQLITE_ROW {
+                    return true
                 }
             }
         }
         
-        // B. 进程树检测：检查 language_server 是否在运行且有派生的非 MCP 任务进程
-        let task = Process()
-        task.launchPath = "/bin/sh"
-        task.arguments = ["-c", """
-        for pid in $(pgrep -f "language_server.*antigravity" 2>/dev/null); do
-            # 检查是否有任务子进程正在跑命令 (如 run_command, git, python 等)
-            for cp in $(pgrep -P "$pid" 2>/dev/null); do
-                c_cmd=$(ps -p "$cp" -o command= 2>/dev/null)
-                case "$c_cmd" in
-                    *workspace-mcp*|*perplexica-mcp*|*rea-agents*|*open-computer-use*|*mcp-searxng*|*" mcp"*)
-                        ;;
-                    *)
-                        if [ -n "$c_cmd" ]; then
-                            exit 0
-                        fi
-                        ;;
-                esac
-            done
-        done
-        exit 1
-        """]
-        do {
-            try task.run()
-            task.waitUntilExit()
-            return task.terminationStatus == 0
-        } catch {
-            return false
-        }
+        return false
     }
     
     /// CodeX CLI 活跃检测：
