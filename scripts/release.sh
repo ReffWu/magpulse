@@ -30,6 +30,8 @@ mkdir -p "$packages"
 touch build/.metadata_never_index 2>/dev/null || true
 
 echo "▸ 2. 生成工程并构建 Release Archive..."
+find Sources Resources -name '.DS_Store' -delete 2>/dev/null || true
+xattr -cr Sources Resources 2>/dev/null || true
 xcodegen generate
 xcodebuild archive -quiet -project "$app.xcodeproj" -scheme "$app" -configuration Release \
   -destination 'generic/platform=macOS' -archivePath "$archive" \

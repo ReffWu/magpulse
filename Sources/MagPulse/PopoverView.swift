@@ -3,6 +3,8 @@ import SwiftUI
 public struct PopoverView: View {
     @ObservedObject var settings = AppSettings.shared
     @ObservedObject var arbiter = ArbiterEngine.shared
+    @ObservedObject var hardware = HardwareController.shared
+    @ObservedObject var updater = Updater.shared
     
     public init() {}
     
@@ -83,12 +85,14 @@ public struct PopoverView: View {
         VStack(spacing: 10) {
             HStack(alignment: .center) {
                 HStack(spacing: 8) {
-                    Image(nsImage: appIconImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 20, height: 20)
-                        .cornerRadius(4)
-                        .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
+                    // 状态栏同款实时 MagSafe 充电头 (纯净透明背景，无黑壳，实时跟随硬件律动)
+                    Image(nsImage: MagSafeIconFactory.makeHeaderPlugIcon(
+                        colorState: hardware.currentHardwareColor,
+                        isEnabled: settings.isEnabled
+                    ))
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 21)
                     
                     Text("MagPulse")
                         .font(.system(size: 15, weight: .semibold))
@@ -319,37 +323,92 @@ public struct PopoverView: View {
     }
     
     private var footerBar: some View {
-        HStack(alignment: .center) {
-            Toggle("开机自启", isOn: $settings.launchAtLogin)
-                .font(.system(size: 11))
-                .toggleStyle(CheckboxToggleStyle())
+        HStack(alignment: .center, spacing: 8) {
+            // 1. 开机自启：精致拟物微胶囊开关
+            Button(action: {
+                settings.launchAtLogin.toggle()
+            }) {
+                HStack(spacing: 5) {
+                    Image(systemName: settings.launchAtLogin ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(settings.launchAtLogin ? .accentColor : .secondary.opacity(0.4))
+                    
+                    Text("开机启动")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(settings.launchAtLogin ? .primary : .secondary)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4.5)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(settings.launchAtLogin ? Color.accentColor.opacity(0.08) : Color.primary.opacity(0.03))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(settings.launchAtLogin ? Color.accentColor.opacity(0.22) : Color.primary.opacity(0.06), lineWidth: 0.5)
+                )
+            }
+            .buttonStyle(.plain)
             
             Spacer()
             
+            // 2. 版本号与检查更新微胶囊
             Button(action: {
-                Updater.shared.checkForUpdates()
+                updater.checkForUpdates()
             }) {
-                HStack(spacing: 3) {
-                    Text("v\(Updater.shared.currentVersion)")
-                        .font(.system(size: 10, weight: .medium))
+                HStack(spacing: 4) {
+                    Text("v\(updater.currentVersion)")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(.secondary)
-                    Text("检查更新")
-                        .font(.system(size: 10))
-                        .foregroundColor(.accentColor)
+                    
+                    if updater.outcome == .checking {
+                        ProgressView()
+                            .scaleEffect(0.45)
+                            .frame(width: 9, height: 9)
+                    } else {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 8.5, weight: .semibold))
+                            .foregroundColor(.secondary.opacity(0.7))
+                    }
                 }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4.5)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.primary.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
+                )
             }
             .buttonStyle(.plain)
+            .help("检查更新 (Sparkle)")
             
-            Text("•")
-                .font(.system(size: 10))
-                .foregroundColor(.secondary.opacity(0.3))
-            
-            Button("退出") {
+            // 3. 退出按钮：紧凑微型图标按钮
+            Button(action: {
                 NSApp.terminate(nil)
+            }) {
+                HStack(spacing: 3.5) {
+                    Image(systemName: "power")
+                        .font(.system(size: 9.5, weight: .bold))
+                    Text("退出")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4.5)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.primary.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
+                )
             }
-            .font(.system(size: 11))
-            .foregroundColor(.secondary)
             .buttonStyle(.plain)
+            .help("退出 MagPulse (⌘Q)")
         }
     }
     

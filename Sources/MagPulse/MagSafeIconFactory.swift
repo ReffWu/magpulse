@@ -84,6 +84,83 @@ public final class MagSafeIconFactory {
         return image
     }
     
+    /// 弹窗内部顶栏使用的实时 MagSafe 接头图标：
+    /// 彻底去除任何外部黑色背景壳子，透明背景，自适应深浅外观，
+    /// 中央保留实时同步的硬件光珠（绿/橙/暗态）。
+    public static func makeHeaderPlugIcon(colorState: String, isEnabled: Bool) -> NSImage {
+        let size = NSSize(width: 22.0, height: 23.0)
+        let image = NSImage(size: size, flipped: false) { rect in
+            guard NSGraphicsContext.current != nil else { return false }
+            
+            let midY: CGFloat = 11.5
+            // 动态前景色：随系统浅色/深色外观自适应（深色模式纯白，浅色模式深黑）
+            let monoColor = NSColor.labelColor
+            
+            // 1. 左边：编织线缆 (宽 4.0 pt, 厚 3.8 pt, 垂直居中)
+            let cableRect = NSRect(x: 1.0, y: midY - 1.9, width: 4.0, height: 3.8)
+            monoColor.withAlphaComponent(0.85).setFill()
+            NSBezierPath(roundedRect: cableRect, xRadius: 0.6, yRadius: 0.6).fill()
+            
+            // 2. 中间：主体方块 (宽 11.6 pt, 高 18.2 pt, 极微圆角)
+            let bodyRect = NSRect(x: 5.0, y: midY - 9.1, width: 11.6, height: 18.2)
+            monoColor.setFill()
+            NSBezierPath(roundedRect: bodyRect, xRadius: 1.2, yRadius: 1.2).fill()
+            
+            // 3. 右边：磁吸前端触点小方块 (宽 1.8 pt, 高 14.2 pt, 垂直居中)
+            let tipRect = NSRect(x: 18.0, y: midY - 7.1, width: 1.8, height: 14.2)
+            monoColor.withAlphaComponent(0.75).setFill()
+            NSBezierPath(roundedRect: tipRect, xRadius: 0.5, yRadius: 0.5).fill()
+            
+            // 4. 正中央指示灯 (中心在 x = 10.8 pt, y = 11.5 pt)
+            let center = CGPoint(x: 10.8, y: midY)
+            let ledRadius: CGFloat = 2.4
+            let ledRect = NSRect(x: center.x - ledRadius, y: center.y - ledRadius, width: ledRadius * 2, height: ledRadius * 2)
+            
+            if !isEnabled {
+                NSColor(white: 0.60, alpha: 1.0).setFill()
+                NSBezierPath(ovalIn: ledRect).fill()
+                
+                let slashPath = NSBezierPath()
+                slashPath.move(to: NSPoint(x: 2.5, y: 19.5))
+                slashPath.line(to: NSPoint(x: 18.5, y: 3.5))
+                slashPath.lineWidth = 1.4
+                NSColor.systemRed.withAlphaComponent(0.95).setStroke()
+                slashPath.stroke()
+                return true
+            }
+            
+            let activeColor: String
+            if colorState == "system" {
+                activeColor = getSystemBatteryLightMode()
+            } else {
+                activeColor = colorState
+            }
+            
+            switch activeColor {
+            case "green":
+                NSColor(red: 0.12, green: 0.90, blue: 0.38, alpha: 1.0).setFill()
+                NSBezierPath(ovalIn: ledRect).fill()
+                
+            case "amber":
+                NSColor(red: 1.0, green: 0.58, blue: 0.0, alpha: 1.0).setFill()
+                NSBezierPath(ovalIn: ledRect).fill()
+                
+            case "off":
+                NSColor(white: 0.70, alpha: 0.8).setFill()
+                NSBezierPath(ovalIn: ledRect).fill()
+                
+            default:
+                NSColor(red: 0.12, green: 0.90, blue: 0.38, alpha: 1.0).setFill()
+                NSBezierPath(ovalIn: ledRect).fill()
+            }
+            
+            return true
+        }
+        
+        image.isTemplate = false
+        return image
+    }
+    
     /// 读取系统当前实际电源充电状态
     private static func getSystemBatteryLightMode() -> String {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
