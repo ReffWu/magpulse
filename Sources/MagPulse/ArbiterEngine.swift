@@ -386,6 +386,8 @@ public final class ArbiterEngine: ObservableObject {
         }
     }
     
+    /// 智能已读与完成态消弭引擎：
+    /// 精准仲裁“任务已完成 (DONE 绿灯)”何时平滑转入“日常待命 (IDLE)”
     private func checkDoneAcknowledgment() {
         let frontBundle = getFrontmostBundleId()
         let idleSec = getSystemIdleSeconds()
@@ -396,40 +398,56 @@ public final class ArbiterEngine: ObservableObject {
             let elapsed = now.timeIntervalSince(enterTime)
             let wasAway = toolDoneWasAway[toolId] ?? false
             
-            if idleSec > 10.0 {
+            // 如果键盘鼠标空闲超过 8 秒，标记为用户处于离开/未关注状态
+            if idleSec > 8.0 {
                 toolDoneWasAway[toolId] = true
             }
             
             let isForeground = isToolForeground(toolId: toolId, bundleId: frontBundle)
             
+            // 【条件 1：全局最大保底】最长闪烁提示 30 秒，无论是否切回均自动优雅归位待机，绝不无休止闪烁
+            if elapsed >= 30.0 {
+                internalSetToolState(toolId: toolId, state: .idle)
+                continue
+            }
+            
+            // 【条件 2：智能已阅消弭】若用户此前离开或切至其他应用，现在切回工作窗口并产生交互（键盘/鼠标活跃），阅读 1.5 秒后自动消除
             if wasAway {
                 if isForeground && idleSec < 3.0 && elapsed >= 1.5 {
                     internalSetToolState(toolId: toolId, state: .idle)
                 }
             } else {
-                if elapsed >= 15.0 {
+                // 【条件 3：在场直面完成】用户一直在该工作窗口前盯着完成，充分提示 10 秒后自动平滑归位待机
+                if elapsed >= 10.0 {
                     internalSetToolState(toolId: toolId, state: .idle)
                 } else if !isForeground && idleSec < 2.0 {
+                    // 若完成初期用户主动切离该窗口，转入离开关注模式
                     toolDoneWasAway[toolId] = true
                 }
             }
         }
     }
     
+    /// 前台关联窗口判定：
+    /// 涵盖原生应用、IDE 编辑器及各种终端宿主（支持内置终端运行 CLI）
     private func isToolForeground(toolId: String, bundleId: String) -> Bool {
+        let b = bundleId.lowercased()
         switch toolId {
         case "claude_desktop":
-            return bundleId == "com.anthropic.claudefordesktop"
+            return b == "com.anthropic.claudefordesktop"
         case "antigravity":
-            return bundleId == "com.google.antigravity"
+            return b == "com.google.antigravity"
         case "cursor":
-            return bundleId.contains("cursor")
+            return b.contains("cursor")
         case "vscode":
-            return bundleId == "com.microsoft.VSCode"
+            return b == "com.microsoft.vscode"
         case "xcode":
-            return bundleId == "com.apple.dt.Xcode"
+            return b.contains("xcode")
         case "terminal", "claude_code", "codex":
-            return bundleId == "com.apple.Terminal" || bundleId.contains("iterm") || bundleId.contains("terminal")
+            // CLI 类工具：不仅支持原生终端/iTerm/Warp，也全面兼容在 Antigravity/VSCode/Cursor 内置终端中执行
+            return b.contains("terminal") || b.contains("iterm") || b.contains("warp") ||
+                   b.contains("ghostty") || b == "com.google.antigravity" ||
+                   b.contains("cursor") || b == "com.microsoft.vscode"
         default:
             return false
         }
