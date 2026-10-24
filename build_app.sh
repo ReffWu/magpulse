@@ -23,6 +23,9 @@ cp "$BIN_DIR/$APP_NAME" "$BUNDLE_DIR/Contents/MacOS/$APP_NAME"
 if [ -f "Resources/AppIcon.icns" ]; then
     cp "Resources/AppIcon.icns" "$BUNDLE_DIR/Contents/Resources/AppIcon.icns"
 fi
+if [ -f "Resources/icon-2048.png" ]; then
+    cp "Resources/icon-2048.png" "$BUNDLE_DIR/Contents/Resources/app_icon.png"
+fi
 
 # 生成 Info.plist
 cat > "$BUNDLE_DIR/Contents/Info.plist" << PLIST

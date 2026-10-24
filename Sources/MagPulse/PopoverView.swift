@@ -59,9 +59,12 @@ public struct PopoverView: View {
         VStack(spacing: 10) {
             HStack(alignment: .center) {
                 HStack(spacing: 8) {
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(stateAccentColor)
+                    Image(nsImage: appIconImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 20, height: 20)
+                        .cornerRadius(4)
+                        .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
                     
                     Text("MagPulse")
                         .font(.system(size: 15, weight: .semibold))
@@ -209,6 +212,14 @@ public struct PopoverView: View {
     }
     
     // MARK: - Helpers
+    
+    private var appIconImage: NSImage {
+        if let path = Bundle.main.path(forResource: "app_icon", ofType: "png"),
+           let img = NSImage(contentsOfFile: path) {
+            return img
+        }
+        return NSApp.applicationIconImage ?? NSImage()
+    }
     
     private var stateAccentColor: Color {
         guard settings.isEnabled else { return .secondary }
