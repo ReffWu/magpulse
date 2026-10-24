@@ -10,8 +10,10 @@ public final class MagSafeIconFactory {
         let image = NSImage(size: size, flipped: false) { rect in
             guard NSGraphicsContext.current != nil else { return false }
             
-            // 纯粹菜单栏高亮纯白
-            let monoColor = NSColor.white
+            // 自动侦测当前菜单栏绘制外观：深色模式使用纯白外壳，浅色模式使用高对比度深碳灰外壳
+            let isDark = NSApp?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            
+            let monoColor = isDark ? NSColor.white : NSColor(white: 0.15, alpha: 1.0)
             let midY: CGFloat = 8.5
             
             // 1. 左边：编织线缆 (宽 3.3 pt, 厚 3.0 pt, 垂直居中)
@@ -37,7 +39,8 @@ public final class MagSafeIconFactory {
             
             if !isEnabled {
                 // 停用状态：浅灰点 + 红色斜杠
-                NSColor(white: 0.70, alpha: 1.0).setFill()
+                let dotGray = isDark ? 0.70 : 0.40
+                NSColor(white: dotGray, alpha: 1.0).setFill()
                 NSBezierPath(ovalIn: ledRect).fill()
                 
                 let slashPath = NSBezierPath()
@@ -69,8 +72,9 @@ public final class MagSafeIconFactory {
                 NSBezierPath(ovalIn: ledRect).fill()
                 
             case "off":
-                // 律动呼吸期间的暗态间歇：浅灰色微点
-                NSColor(white: 0.82, alpha: 1.0).setFill()
+                // 律动呼吸期间的暗态间歇：随背景自适应的浅灰微点
+                let offGray = isDark ? 0.82 : 0.35
+                NSColor(white: offGray, alpha: 1.0).setFill()
                 NSBezierPath(ovalIn: ledRect).fill()
                 
             default:

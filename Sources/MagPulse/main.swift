@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private var cancellables = Set<AnyCancellable>()
+    private var batteryTimer: Timer?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -13,9 +14,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupPopover()
         setupStatusItem()
         bindState()
+        observeSystemTheme()
+        startBatteryPolling()
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        batteryTimer?.invalidate()
         HardwareController.shared.stopEngine()
     }
     
@@ -30,14 +34,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.image = MagSafeIconFactory.makeIcon(
-                colorState: HardwareController.shared.currentHardwareColor,
-                isEnabled: AppSettings.shared.isEnabled
-            )
+            refreshButtonImage()
             button.action = #selector(statusItemClicked)
             button.target = self
             button.sendAction(on: [.leftMouseDown])
         }
+    }
+    
+    private func refreshButtonImage() {
+        guard let button = statusItem?.button else { return }
+        button.image = MagSafeIconFactory.makeIcon(
+            colorState: HardwareController.shared.currentHardwareColor,
+            isEnabled: AppSettings.shared.isEnabled
+        )
     }
     
     @objc private func statusItemClicked() {
@@ -57,14 +66,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AppSettings.shared.$isEnabled
         )
         .receive(on: RunLoop.main)
-        .sink { [weak self] colorState, isEnabled in
-            guard let self = self, let button = self.statusItem.button else { return }
-            button.image = MagSafeIconFactory.makeIcon(
-                colorState: colorState,
-                isEnabled: isEnabled
-            )
+        .sink { [weak self] _, _ in
+            self?.refreshButtonImage()
         }
         .store(in: &cancellables)
+    }
+    
+    private func observeSystemTheme() {
+        // 监听系统深浅外观切换，瞬间刷新菜单栏自适应色
+        DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.refreshButtonImage()
+        }
+    }
+    
+    private func startBatteryPolling() {
+        // 在待命状态下，低频感知系统电源插拔与充满状态，确保灯光 100% 实时同步
+        batteryTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
+            if HardwareController.shared.currentHardwareColor == "system" {
+                self?.refreshButtonImage()
+            }
+        }
     }
 }
 

@@ -86,8 +86,10 @@ public final class AppSettings: ObservableObject {
     
     private func updateLaunchAtLogin(_ enable: Bool) {
         // LaunchAgent plist 管理
+        let agentsDir = ("~/Library/LaunchAgents" as NSString).expandingTildeInPath
         let agentPath = ("~/Library/LaunchAgents/com.reff.MagPulse.plist" as NSString).expandingTildeInPath
         if enable {
+            try? FileManager.default.createDirectory(atPath: agentsDir, withIntermediateDirectories: true)
             let appPath = ("~/Applications/MagPulse.app/Contents/MacOS/MagPulse" as NSString).expandingTildeInPath
             let plistContent = """
             <?xml version="1.0" encoding="UTF-8"?>

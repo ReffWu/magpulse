@@ -64,10 +64,13 @@ public final class ArbiterEngine: ObservableObject {
         }
     }
     
-    public func triggerTest(state: MagPulseState, duration: TimeInterval = 5.0) {
+    public func triggerTest(state: MagPulseState, duration: TimeInterval = 4.0) {
         isTesting = true
         testState = state
         HardwareController.shared.setState(state)
+        DispatchQueue.main.async { [weak self] in
+            self?.effectiveState = state
+        }
         
         testTimer?.invalidate()
         testTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
@@ -220,6 +223,38 @@ public final class ArbiterEngine: ObservableObject {
         if enabled.contains("antigravity") {
             let isAntigravityRunning = isAntigravityActive()
             handleWatchdogLevel(toolId: "antigravity", isRunning: isAntigravityRunning)
+        }
+        
+        // D. Claude Code CLI 活跃检测
+        if enabled.contains("claude_code") {
+            let isClaudeRunning = isClaudeCodeActive()
+            handleWatchdogLevel(toolId: "claude_code", isRunning: isClaudeRunning)
+        }
+    }
+    
+    /// Claude Code CLI 活跃检测
+    private func isClaudeCodeActive() -> Bool {
+        let task = Process()
+        task.launchPath = "/bin/sh"
+        task.arguments = ["-c", """
+        for pid in $(pgrep -f "claude" 2>/dev/null); do
+            cmd=$(ps -p $pid -o command= 2>/dev/null)
+            case "$cmd" in
+                *magsafe*|*MagPulse*|*grep*|*python*)
+                    ;;
+                *bin/claude*|*@anthropic-ai/claude-code*)
+                    exit 0
+                    ;;
+            esac
+        done
+        exit 1
+        """]
+        do {
+            try task.run()
+            task.waitUntilExit()
+            return task.terminationStatus == 0
+        } catch {
+            return false
         }
     }
     
