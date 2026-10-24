@@ -26,6 +26,9 @@ fi
 if [ -f "Resources/icon-2048.png" ]; then
     cp "Resources/icon-2048.png" "$BUNDLE_DIR/Contents/Resources/app_icon.png"
 fi
+if [ -d "Resources/Icons" ]; then
+    cp -r "Resources/Icons" "$BUNDLE_DIR/Contents/Resources/Icons"
+fi
 
 # 生成 Info.plist
 cat > "$BUNDLE_DIR/Contents/Info.plist" << PLIST

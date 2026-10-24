@@ -17,20 +17,34 @@ public struct PopoverView: View {
             Divider()
                 .opacity(0.15)
             
-            // 2. 工具选择列表
+            // 2. 工具选择列表 (分组展示: 桌面应用 vs 命令行终端)
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 14) {
-                    sectionTitle("联动监控目标", icon: "target")
+                    // 分组 1: 桌面应用
+                    sectionTitle("桌面应用 (Apps)", icon: "macwindow")
                     
                     VStack(spacing: 6) {
-                        ForEach(AppSettings.allAvailableTools) { tool in
+                        ForEach(AppSettings.desktopApps) { tool in
                             toolRow(tool)
                         }
                     }
                     
                     Divider()
                         .opacity(0.12)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 2)
+                    
+                    // 分组 2: 命令行与终端
+                    sectionTitle("命令行与终端 (CLI / Terminal)", icon: "terminal")
+                    
+                    VStack(spacing: 6) {
+                        ForEach(AppSettings.cliTools) { tool in
+                            toolRow(tool)
+                        }
+                    }
+                    
+                    Divider()
+                        .opacity(0.12)
+                        .padding(.vertical, 2)
                     
                     sectionTitle("物理灯效速测", icon: "sparkle")
                     
@@ -39,7 +53,7 @@ public struct PopoverView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
-            .frame(maxHeight: 330)
+            .frame(maxHeight: 380)
             
             Divider()
                 .opacity(0.15)
@@ -49,7 +63,7 @@ public struct PopoverView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
         }
-        .frame(width: 320, height: 460)
+        .frame(width: 330, height: 510)
         .background(VisualEffectView(material: .popover, blendingMode: .behindWindow))
     }
     
@@ -121,10 +135,8 @@ public struct PopoverView: View {
             settings.toggleTool(tool.id)
         }) {
             HStack(spacing: 10) {
-                Image(systemName: tool.icon)
-                    .font(.system(size: 13))
-                    .foregroundColor(isChecked ? .primary : .secondary.opacity(0.5))
-                    .frame(width: 18)
+                // 原生官方高保真彩色图标
+                toolIconView(tool, isChecked: isChecked)
                 
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 6) {
@@ -159,6 +171,35 @@ public struct PopoverView: View {
             .background(RoundedRectangle(cornerRadius: 6).fill(isChecked ? Color.primary.opacity(0.03) : Color.clear))
         }
         .buttonStyle(.plain)
+    }
+    
+    private func toolIconView(_ tool: MonitoredTool, isChecked: Bool) -> some View {
+        Group {
+            if let image = loadIconImage(named: tool.iconName) {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 22, height: 22)
+                    .cornerRadius(4.5)
+                    .shadow(color: Color.black.opacity(0.12), radius: 1.5, x: 0, y: 1)
+                    .opacity(isChecked ? 1.0 : 0.4)
+            } else {
+                Image(systemName: tool.fallbackSF)
+                    .font(.system(size: 14))
+                    .foregroundColor(isChecked ? .primary : .secondary.opacity(0.5))
+                    .frame(width: 22, height: 22)
+            }
+        }
+    }
+    
+    private func loadIconImage(named: String) -> NSImage? {
+        if let path = Bundle.main.path(forResource: "Icons/\(named)", ofType: "png") {
+            return NSImage(contentsOfFile: path)
+        }
+        if let path = Bundle.main.path(forResource: named, ofType: "png") {
+            return NSImage(contentsOfFile: path)
+        }
+        return nil
     }
     
     private var testButtonGroup: some View {

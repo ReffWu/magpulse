@@ -4,15 +4,17 @@ import Combine
 public struct MonitoredTool: Identifiable, Hashable {
     public let id: String
     public let name: String
-    public let category: String
-    public let icon: String
+    public let group: String       // "桌面应用" 或 "命令行终端"
+    public let iconName: String    // 对应 Resources/Icons/<iconName>.png
+    public let fallbackSF: String  // 备用 SF Symbol
     public let detail: String
     
-    public init(id: String, name: String, category: String, icon: String, detail: String) {
+    public init(id: String, name: String, group: String, iconName: String, fallbackSF: String, detail: String) {
         self.id = id
         self.name = name
-        self.category = category
-        self.icon = icon
+        self.group = group
+        self.iconName = iconName
+        self.fallbackSF = fallbackSF
         self.detail = detail
     }
 }
@@ -20,16 +22,26 @@ public struct MonitoredTool: Identifiable, Hashable {
 public final class AppSettings: ObservableObject {
     public static let shared = AppSettings()
     
-    public static let allAvailableTools: [MonitoredTool] = [
-        MonitoredTool(id: "claude_desktop", name: "Claude Desktop", category: "AI 助手", icon: "sparkles", detail: "Claude Mac 桌面端应用"),
-        MonitoredTool(id: "claude_code", name: "Claude Code CLI", category: "AI 编程", icon: "terminal", detail: "终端 claude 命令行"),
-        MonitoredTool(id: "codex", name: "CodeX CLI", category: "AI 编程", icon: "chevron.left.forwardslash.chevron.right", detail: "OpenAI CodeX 命令行"),
-        MonitoredTool(id: "antigravity", name: "Antigravity", category: "AI 编程", icon: "wand.and.stars", detail: "Antigravity 编程助手"),
-        MonitoredTool(id: "cursor", name: "Cursor", category: "编辑器", icon: "curlybraces", detail: "Cursor IDE 活跃执行"),
-        MonitoredTool(id: "vscode", name: "Visual Studio Code", category: "编辑器", icon: "doc.text.below.ecg", detail: "VS Code 构建/任务"),
-        MonitoredTool(id: "xcode", name: "Xcode / xcodebuild", category: "开发工具", icon: "hammer", detail: "原生编译与归档打包"),
-        MonitoredTool(id: "terminal", name: "Terminal.app", category: "终端", icon: "apple.terminal", detail: "系统终端耗时任务")
+    // 分组 1: 桌面应用 (Desktop Apps)
+    public static let desktopApps: [MonitoredTool] = [
+        MonitoredTool(id: "antigravity", name: "Antigravity", group: "桌面应用", iconName: "antigravity", fallbackSF: "wand.and.stars", detail: "Google DeepMind 编程助手"),
+        MonitoredTool(id: "claude_desktop", name: "Claude Desktop", group: "桌面应用", iconName: "claude_desktop", fallbackSF: "sparkles", detail: "Anthropic Claude 桌面客户端"),
+        MonitoredTool(id: "chatgpt_desktop", name: "ChatGPT (Code Mode)", group: "桌面应用", iconName: "chatgpt_desktop", fallbackSF: "bubble.left.and.text.bubble.right", detail: "OpenAI ChatGPT 桌面客户端"),
+        MonitoredTool(id: "cursor", name: "Cursor", group: "桌面应用", iconName: "cursor", fallbackSF: "curlybraces", detail: "Cursor IDE 智能编程编辑器"),
+        MonitoredTool(id: "vscode", name: "Visual Studio Code", group: "桌面应用", iconName: "vscode", fallbackSF: "doc.text.below.ecg", detail: "VS Code 构建与智能任务"),
+        MonitoredTool(id: "xcode", name: "Xcode / xcodebuild", group: "桌面应用", iconName: "xcode", fallbackSF: "hammer", detail: "Apple 原生编译构建与打包")
     ]
+    
+    // 分组 2: 命令行与终端 (CLI / Terminal)
+    public static let cliTools: [MonitoredTool] = [
+        MonitoredTool(id: "claude_code", name: "Claude Code CLI", group: "命令行终端", iconName: "claude_code", fallbackSF: "terminal", detail: "终端 claude 命令行智能助手"),
+        MonitoredTool(id: "codex", name: "CodeX CLI", group: "命令行终端", iconName: "codex", fallbackSF: "chevron.left.forwardslash.chevron.right", detail: "终端 codex 命令行智能助手"),
+        MonitoredTool(id: "terminal", name: "Terminal & Shell Tasks", group: "命令行终端", iconName: "terminal", fallbackSF: "apple.terminal", detail: "系统终端耗时与编译任务")
+    ]
+    
+    public static var allAvailableTools: [MonitoredTool] {
+        return desktopApps + cliTools
+    }
     
     private let defaults = UserDefaults.standard
     private let kIsEnabled = "MagPulse_IsEnabled"
@@ -65,8 +77,8 @@ public final class AppSettings: ObservableObject {
         if let saved = defaults.stringArray(forKey: kEnabledTools) {
             self.enabledToolIds = Set(saved)
         } else {
-            // 默认勾选核心 AI 工具与 Xcode
-            self.enabledToolIds = ["claude_desktop", "claude_code", "codex", "antigravity", "cursor", "vscode", "xcode"]
+            // 默认勾选核心 AI 桌面与 CLI 工具
+            self.enabledToolIds = ["antigravity", "claude_desktop", "chatgpt_desktop", "claude_code", "codex", "cursor", "vscode", "xcode"]
         }
         
         self.launchAtLogin = defaults.bool(forKey: kLaunchAtLogin)

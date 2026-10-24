@@ -230,6 +230,35 @@ public final class ArbiterEngine: ObservableObject {
             let isClaudeRunning = isClaudeCodeActive()
             handleWatchdogLevel(toolId: "claude_code", isRunning: isClaudeRunning)
         }
+        
+        // E. ChatGPT 桌面版检测
+        if enabled.contains("chatgpt_desktop") {
+            let isChatGPTBusy = isChatGPTAppBusy()
+            handleWatchdogLevel(toolId: "chatgpt_desktop", isRunning: isChatGPTBusy)
+        }
+    }
+    
+    /// ChatGPT 桌面版活跃计算检测 (CPU > 20% 时判定为深度执行)
+    private func isChatGPTAppBusy() -> Bool {
+        let task = Process()
+        task.launchPath = "/bin/sh"
+        task.arguments = ["-c", """
+        for pid in $(pgrep -f "ChatGPT.app/Contents/MacOS/ChatGPT" 2>/dev/null); do
+            cpu=$(ps -p "$pid" -o %cpu= 2>/dev/null | tr -d ' ')
+            is_busy=$(awk -v c="$cpu" 'BEGIN {print (c > 20.0) ? "1" : "0"}')
+            if [ "$is_busy" = "1" ]; then
+                exit 0
+            fi
+        done
+        exit 1
+        """]
+        do {
+            try task.run()
+            task.waitUntilExit()
+            return task.terminationStatus == 0
+        } catch {
+            return false
+        }
     }
     
     /// Claude Code CLI 活跃检测
@@ -435,6 +464,8 @@ public final class ArbiterEngine: ObservableObject {
         switch toolId {
         case "claude_desktop":
             return b == "com.anthropic.claudefordesktop"
+        case "chatgpt_desktop":
+            return b == "com.openai.codex" || b.contains("chatgpt")
         case "antigravity":
             return b == "com.google.antigravity"
         case "cursor":
