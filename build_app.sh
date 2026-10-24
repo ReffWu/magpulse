@@ -3,7 +3,7 @@ set -euo pipefail
 
 APP_NAME="MagPulse"
 BUNDLE_ID="com.reffwu.magpulse"
-VERSION="1.0.0"
+VERSION="1.0.1"
 SIGN_IDENTITY="Apple Development: reffwu@icloud.com (RYP73FWJ3Y)"
 
 # 检查证书是否存在
